@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import getIcon from '../utils/iconUtils';
+import KanbanBoard from './KanbanBoard';
 
 export default function MainFeature({ onTaskChange }) {
   // Icons
@@ -19,6 +20,8 @@ export default function MainFeature({ onTaskChange }) {
   const Save = getIcon('Save');
   const X = getIcon('X');
   const GripVertical = getIcon('GripVertical');
+  const List = getIcon('List');
+  const LayoutGrid = getIcon('LayoutGrid');
 
   // States
   const [tasks, setTasks] = useState([]);
@@ -31,6 +34,7 @@ export default function MainFeature({ onTaskChange }) {
   const [editDueDate, setEditDueDate] = useState("");
   const [editPriority, setEditPriority] = useState("");
   const [draggedItem, setDraggedItem] = useState(null);
+  const [view, setView] = useState("list"); // new state for view toggle
   
   // Refs
   const dragItemRef = useRef(null);
@@ -63,7 +67,8 @@ export default function MainFeature({ onTaskChange }) {
       completed: false,
       createdAt: new Date().toISOString(),
       dueDate: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : null,
-      priority: newTaskPriority
+      priority: newTaskPriority,
+      status: "todo" // default status for new tasks
     };
     
     setTasks([...tasks, newTaskObj]);
@@ -82,9 +87,15 @@ export default function MainFeature({ onTaskChange }) {
   
   // Toggle task completion
   const handleToggleComplete = (id) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, completed: !task.completed } : task
-    ));
+    setTasks(tasks.map(task => {
+      if (task.id === id) {
+        const completed = !task.completed;
+        // If task is completed, move it to Done column in Kanban
+        const status = completed ? "done" : task.status === "done" ? "todo" : task.status;
+        return { ...task, completed, status };
+      }
+      return task;
+    }));
   };
   
   // Start editing task
@@ -195,6 +206,11 @@ export default function MainFeature({ onTaskChange }) {
     e.preventDefault();
     dragOverItemRef.current = index;
   };
+
+  // Handle kanban board task updates
+  const handleKanbanTaskChange = (updatedTasks) => {
+    setTasks(updatedTasks);
+  };
   
   // Filter tasks based on filter state
   const filteredTasks = tasks.filter(task => {
@@ -299,197 +315,238 @@ export default function MainFeature({ onTaskChange }) {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <h2 className="text-xl font-semibold">Your Tasks</h2>
           
-          <div className="bg-surface-100 dark:bg-surface-700 rounded-lg p-1 flex">
-            <button
-              className={`px-3 py-1.5 text-sm rounded-md transition ${
-                filter === "all" 
-                  ? "bg-white dark:bg-surface-600 shadow-sm" 
-                  : "hover:bg-white/50 dark:hover:bg-surface-600/50"
-              }`}
-              onClick={() => setFilter("all")}
-            >
-              All
-            </button>
-            <button
-              className={`px-3 py-1.5 text-sm rounded-md transition ${
-                filter === "active" 
-                  ? "bg-white dark:bg-surface-600 shadow-sm" 
-                  : "hover:bg-white/50 dark:hover:bg-surface-600/50"
-              }`}
-              onClick={() => setFilter("active")}
-            >
-              Active
-            </button>
-            <button
-              className={`px-3 py-1.5 text-sm rounded-md transition ${
-                filter === "completed" 
-                  ? "bg-white dark:bg-surface-600 shadow-sm" 
-                  : "hover:bg-white/50 dark:hover:bg-surface-600/50"
-              }`}
-              onClick={() => setFilter("completed")}
-            >
-              Completed
-            </button>
+          <div className="flex gap-3">
+            <div className="bg-surface-100 dark:bg-surface-700 rounded-lg p-1 flex">
+              <button
+                className={`px-3 py-1.5 text-sm rounded-md transition flex items-center gap-1.5 ${
+                  view === "list" 
+                    ? "bg-white dark:bg-surface-600 shadow-sm" 
+                    : "hover:bg-white/50 dark:hover:bg-surface-600/50"
+                }`}
+                onClick={() => setView("list")}
+              >
+                <List className="w-4 h-4" />
+                List
+              </button>
+              <button
+                className={`px-3 py-1.5 text-sm rounded-md transition flex items-center gap-1.5 ${
+                  view === "kanban" 
+                    ? "bg-white dark:bg-surface-600 shadow-sm" 
+                    : "hover:bg-white/50 dark:hover:bg-surface-600/50"
+                }`}
+                onClick={() => setView("kanban")}
+              >
+                <LayoutGrid className="w-4 h-4" />
+                Kanban
+              </button>
+            </div>
+            
+            {view === "list" && (
+              <div className="bg-surface-100 dark:bg-surface-700 rounded-lg p-1 flex">
+                <button
+                  className={`px-3 py-1.5 text-sm rounded-md transition ${
+                    filter === "all" 
+                      ? "bg-white dark:bg-surface-600 shadow-sm" 
+                      : "hover:bg-white/50 dark:hover:bg-surface-600/50"
+                  }`}
+                  onClick={() => setFilter("all")}
+                >
+                  All
+                </button>
+                <button
+                  className={`px-3 py-1.5 text-sm rounded-md transition ${
+                    filter === "active" 
+                      ? "bg-white dark:bg-surface-600 shadow-sm" 
+                      : "hover:bg-white/50 dark:hover:bg-surface-600/50"
+                  }`}
+                  onClick={() => setFilter("active")}
+                >
+                  Active
+                </button>
+                <button
+                  className={`px-3 py-1.5 text-sm rounded-md transition ${
+                    filter === "completed" 
+                      ? "bg-white dark:bg-surface-600 shadow-sm" 
+                      : "hover:bg-white/50 dark:hover:bg-surface-600/50"
+                  }`}
+                  onClick={() => setFilter("completed")}
+                >
+                  Completed
+                </button>
+              </div>
+            )}
           </div>
         </div>
         
-        {filteredTasks.length === 0 ? (
-          <div className="text-center py-10 border-2 border-dashed border-surface-200 dark:border-surface-700 rounded-lg">
-            <CheckCircle className="w-12 h-12 mx-auto text-surface-400 mb-3" />
-            <h3 className="text-xl font-medium mb-1">No tasks here</h3>
-            <p className="text-surface-500 dark:text-surface-400">
-              {filter === "all" 
-                ? "Add your first task to get started" 
-                : filter === "active"
-                  ? "No active tasks found"
-                  : "No completed tasks yet"}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <AnimatePresence initial={false}>
-              {filteredTasks.map((task, index) => (
-                <motion.div
-                  key={task.id}
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className={`relative p-4 border dark:border-surface-700 rounded-xl ${
-                    draggedItem === index
-                      ? "opacity-50 shadow-lg bg-surface-50/80 dark:bg-surface-700/80 border-primary/20 dark:border-primary/20"
-                      : task.completed
-                        ? "bg-surface-100/50 dark:bg-surface-800/50"
-                        : "bg-white dark:bg-surface-800"
-                  }`}
-                  draggable={editingTask !== task.id}
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragEnter={(e) => handleDragEnter(e, index)}
-                >
-                  {editingTask === task.id ? (
-                    <div className="space-y-3">
-                      <input
-                        type="text"
-                        className="input"
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        autoFocus
-                      />
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <input
-                          type="date"
-                          className="input"
-                          value={editDueDate}
-                          onChange={(e) => setEditDueDate(e.target.value)}
-                        />
-                        
-                        <select
-                          className="input"
-                          value={editPriority}
-                          onChange={(e) => setEditPriority(e.target.value)}
-                        >
-                          <option value="low">Low</option>
-                          <option value="medium">Medium</option>
-                          <option value="high">High</option>
-                        </select>
-                      </div>
-                      
-                      <div className="flex gap-2 mt-3">
-                        <button
-                          onClick={handleSaveEdit}
-                          className="btn btn-primary flex items-center gap-1 text-sm"
-                        >
-                          <Save className="w-4 h-4" />
-                          Save
-                        </button>
-                        
-                        <button
-                          onClick={handleCancelEdit}
-                          className="btn btn-outline flex items-center gap-1 text-sm"
-                        >
-                          <X className="w-4 h-4" />
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-start gap-3">
-                        <div 
-                          className="flex-shrink-0 mr-1 cursor-grab text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
-                        >
-                          <GripVertical className="w-5 h-5" />
-                        </div>
-                      
-                        <button
-                          onClick={() => handleToggleComplete(task.id)}
-                          className={`flex-shrink-0 mt-0.5 ${
-                            task.completed ? "text-secondary" : "text-surface-400"
-                          }`}
-                        >
-                          {task.completed ? (
-                            <CheckSquare className="w-5 h-5" />
-                          ) : (
-                            <Square className="w-5 h-5" />
-                          )}
-                        </button>
-                        
-                        <div className="flex-grow min-w-0">
-                          <p className={`${
-                            task.completed
-                              ? "line-through text-surface-400 dark:text-surface-500"
-                              : "text-surface-800 dark:text-surface-100"
-                          }`}>
-                            {task.text}
-                          </p>
+        {view === "list" ? (
+          <>
+            {filteredTasks.length === 0 ? (
+              <div className="text-center py-10 border-2 border-dashed border-surface-200 dark:border-surface-700 rounded-lg">
+                <CheckCircle className="w-12 h-12 mx-auto text-surface-400 mb-3" />
+                <h3 className="text-xl font-medium mb-1">No tasks here</h3>
+                <p className="text-surface-500 dark:text-surface-400">
+                  {filter === "all" 
+                    ? "Add your first task to get started" 
+                    : filter === "active"
+                      ? "No active tasks found"
+                      : "No completed tasks yet"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <AnimatePresence initial={false}>
+                  {filteredTasks.map((task, index) => (
+                    <motion.div
+                      key={task.id}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className={`relative p-4 border dark:border-surface-700 rounded-xl ${
+                        draggedItem === index
+                          ? "opacity-50 shadow-lg bg-surface-50/80 dark:bg-surface-700/80 border-primary/20 dark:border-primary/20"
+                          : task.completed
+                            ? "bg-surface-100/50 dark:bg-surface-800/50"
+                            : "bg-white dark:bg-surface-800"
+                      }`}
+                      draggable={editingTask !== task.id}
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragEnter={(e) => handleDragEnter(e, index)}
+                    >
+                      {editingTask === task.id ? (
+                        <div className="space-y-3">
+                          <input
+                            type="text"
+                            className="input"
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            autoFocus
+                          />
                           
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {task.dueDate && (
-                              <span className="inline-flex items-center text-xs px-2 py-1 rounded-md bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
-                                <Clock className="w-3 h-3 mr-1" />
-                                {format(new Date(task.dueDate), 'MMM d, yyyy')}
-                              </span>
-                            )}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <input
+                              type="date"
+                              className="input"
+                              value={editDueDate}
+                              onChange={(e) => setEditDueDate(e.target.value)}
+                            />
                             
-                            {task.priority && (
-                              <span className={`inline-flex items-center text-xs px-2 py-1 rounded-md ${
-                                getPriorityBadge(task.priority).bg
-                              } ${getPriorityBadge(task.priority).text}`}>
-                                {getPriorityBadge(task.priority).icon}
-                                {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                              </span>
-                            )}
+                            <select
+                              className="input"
+                              value={editPriority}
+                              onChange={(e) => setEditPriority(e.target.value)}
+                            >
+                              <option value="low">Low</option>
+                              <option value="medium">Medium</option>
+                              <option value="high">High</option>
+                            </select>
+                          </div>
+                          
+                          <div className="flex gap-2 mt-3">
+                            <button
+                              onClick={handleSaveEdit}
+                              className="btn btn-primary flex items-center gap-1 text-sm"
+                            >
+                              <Save className="w-4 h-4" />
+                              Save
+                            </button>
+                            
+                            <button
+                              onClick={handleCancelEdit}
+                              className="btn btn-outline flex items-center gap-1 text-sm"
+                            >
+                              <X className="w-4 h-4" />
+                              Cancel
+                            </button>
                           </div>
                         </div>
-                        
-                        <div className="flex flex-shrink-0 gap-1">
-                          <button
-                            onClick={() => handleStartEdit(task)}
-                            className="p-1.5 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200 transition-colors"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
+                      ) : (
+                        <>
+                          <div className="flex items-start gap-3">
+                            <div 
+                              className="flex-shrink-0 mr-1 cursor-grab text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
+                            >
+                              <GripVertical className="w-5 h-5" />
+                            </div>
                           
-                          <button
-                            onClick={() => handleDeleteTask(task.id)}
-                            className="p-1.5 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-500 hover:text-red-600 dark:text-surface-400 dark:hover:text-red-400 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+                            <button
+                              onClick={() => handleToggleComplete(task.id)}
+                              className={`flex-shrink-0 mt-0.5 ${
+                                task.completed ? "text-secondary" : "text-surface-400"
+                              }`}
+                            >
+                              {task.completed ? (
+                                <CheckSquare className="w-5 h-5" />
+                              ) : (
+                                <Square className="w-5 h-5" />
+                              )}
+                            </button>
+                            
+                            <div className="flex-grow min-w-0">
+                              <p className={`${
+                                task.completed
+                                  ? "line-through text-surface-400 dark:text-surface-500"
+                                  : "text-surface-800 dark:text-surface-100"
+                              }`}>
+                                {task.text}
+                              </p>
+                              
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {task.dueDate && (
+                                  <span className="inline-flex items-center text-xs px-2 py-1 rounded-md bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    {format(new Date(task.dueDate), 'MMM d, yyyy')}
+                                  </span>
+                                )}
+                                
+                                {task.priority && (
+                                  <span className={`inline-flex items-center text-xs px-2 py-1 rounded-md ${
+                                    getPriorityBadge(task.priority).bg
+                                  } ${getPriorityBadge(task.priority).text}`}>
+                                    {getPriorityBadge(task.priority).icon}
+                                    {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="flex flex-shrink-0 gap-1">
+                              <button
+                                onClick={() => handleStartEdit(task)}
+                                className="p-1.5 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200 transition-colors"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              
+                              <button
+                                onClick={() => handleDeleteTask(task.id)}
+                                className="p-1.5 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-500 hover:text-red-600 dark:text-surface-400 dark:hover:text-red-400 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </>
+        ) : (
+          <KanbanBoard 
+            tasks={tasks} 
+            onTaskChange={handleKanbanTaskChange}
+            onEditTask={handleStartEdit}
+            onDeleteTask={handleDeleteTask}
+            onToggleComplete={handleToggleComplete}
+          />
         )}
         
-        {tasks.length > 0 && (
+        {tasks.length > 0 && view === "list" && (
           <div className="mt-4 text-sm text-surface-500 dark:text-surface-400">
             {tasks.filter(t => t.completed).length} of {tasks.length} tasks completed
           </div>
