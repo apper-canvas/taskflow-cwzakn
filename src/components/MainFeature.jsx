@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import getIcon from '../utils/iconUtils';
@@ -18,6 +19,7 @@ export default function MainFeature({ onTaskChange }) {
   const Edit = getIcon('Edit');
   const Save = getIcon('Save');
   const X = getIcon('X');
+  const GripVertical = getIcon('GripVertical');
 
   // States
   const [tasks, setTasks] = useState([]);
@@ -112,6 +114,34 @@ export default function MainFeature({ onTaskChange }) {
   // Cancel editing
   const handleCancelEdit = () => {
     setEditingTask(null);
+  };
+  
+  // Handle drag end event
+  const handleDragEnd = (result) => {
+    if (!result.destination) return;
+    
+    const sourceIndex = result.source.index;
+    const destinationIndex = result.destination.index;
+    
+    if (sourceIndex === destinationIndex) return;
+    
+    const filteredTasksCopy = [...filteredTasks];
+    const [removed] = filteredTasksCopy.splice(sourceIndex, 1);
+    filteredTasksCopy.splice(destinationIndex, 0, removed);
+    
+    // Create a new array with all tasks, maintaining the order of non-filtered tasks
+    const newTasksOrder = [...tasks];
+    
+    // Map the filtered tasks back to their original indices in the complete tasks array
+    filteredTasks.forEach((task, index) => {
+      const originalIndex = newTasksOrder.findIndex(t => t.id === task.id);
+      if (originalIndex !== -1) {
+        newTasksOrder[originalIndex] = filteredTasksCopy[index];
+      }
+    });
+    
+    setTasks(newTasksOrder);
+    toast.success("Task order updated");
   };
   
   // Filter tasks based on filter state
@@ -264,134 +294,164 @@ export default function MainFeature({ onTaskChange }) {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            <AnimatePresence initial={false}>
-              {filteredTasks.map(task => (
-                <motion.div
-                  key={task.id}
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className={`relative p-4 border dark:border-surface-700 rounded-xl ${
-                    task.completed
-                      ? "bg-surface-100/50 dark:bg-surface-800/50"
-                      : "bg-white dark:bg-surface-800"
-                  }`}
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="tasks">
+              {(provided) => (
+                <div 
+                  className="space-y-3"
+                  {...provided.droppableProps}
+                  ref={provided.innerRef}
                 >
-                  {editingTask === task.id ? (
-                    <div className="space-y-3">
-                      <input
-                        type="text"
-                        className="input"
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        autoFocus
-                      />
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <input
-                          type="date"
-                          className="input"
-                          value={editDueDate}
-                          onChange={(e) => setEditDueDate(e.target.value)}
-                        />
-                        
-                        <select
-                          className="input"
-                          value={editPriority}
-                          onChange={(e) => setEditPriority(e.target.value)}
-                        >
-                          <option value="low">Low</option>
-                          <option value="medium">Medium</option>
-                          <option value="high">High</option>
-                        </select>
-                      </div>
-                      
-                      <div className="flex gap-2 mt-3">
-                        <button
-                          onClick={handleSaveEdit}
-                          className="btn btn-primary flex items-center gap-1 text-sm"
-                        >
-                          <Save className="w-4 h-4" />
-                          Save
-                        </button>
-                        
-                        <button
-                          onClick={handleCancelEdit}
-                          className="btn btn-outline flex items-center gap-1 text-sm"
-                        >
-                          <X className="w-4 h-4" />
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-start gap-3">
-                        <button
-                          onClick={() => handleToggleComplete(task.id)}
-                          className={`flex-shrink-0 mt-0.5 ${
-                            task.completed ? "text-secondary" : "text-surface-400"
-                          }`}
-                        >
-                          {task.completed ? (
-                            <CheckSquare className="w-5 h-5" />
-                          ) : (
-                            <Square className="w-5 h-5" />
-                          )}
-                        </button>
-                        
-                        <div className="flex-grow min-w-0">
-                          <p className={`${
-                            task.completed
-                              ? "line-through text-surface-400 dark:text-surface-500"
-                              : "text-surface-800 dark:text-surface-100"
-                          }`}>
-                            {task.text}
-                          </p>
-                          
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {task.dueDate && (
-                              <span className="inline-flex items-center text-xs px-2 py-1 rounded-md bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
-                                <Clock className="w-3 h-3 mr-1" />
-                                {format(new Date(task.dueDate), 'MMM d, yyyy')}
-                              </span>
-                            )}
-                            
-                            {task.priority && (
-                              <span className={`inline-flex items-center text-xs px-2 py-1 rounded-md ${
-                                getPriorityBadge(task.priority).bg
-                              } ${getPriorityBadge(task.priority).text}`}>
-                                {getPriorityBadge(task.priority).icon}
-                                {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-shrink-0 gap-1">
-                          <button
-                            onClick={() => handleStartEdit(task)}
-                            className="p-1.5 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200 transition-colors"
+                  <AnimatePresence initial={false}>
+                    {filteredTasks.map((task, index) => (
+                      <Draggable 
+                        key={task.id} 
+                        draggableId={task.id.toString()} 
+                        index={index}
+                        isDragDisabled={editingTask === task.id}
+                      >
+                        {(provided, snapshot) => (
+                          <motion.div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className={`relative p-4 border dark:border-surface-700 rounded-xl ${
+                              snapshot.isDragging
+                                ? "shadow-lg bg-surface-50/80 dark:bg-surface-700/80 border-primary/20 dark:border-primary/20"
+                                : task.completed
+                                  ? "bg-surface-100/50 dark:bg-surface-800/50"
+                                  : "bg-white dark:bg-surface-800"
+                            }`}
                           >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          
-                          <button
-                            onClick={() => handleDeleteTask(task.id)}
-                            className="p-1.5 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-500 hover:text-red-600 dark:text-surface-400 dark:hover:text-red-400 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+                            {editingTask === task.id ? (
+                              <div className="space-y-3">
+                                <input
+                                  type="text"
+                                  className="input"
+                                  value={editText}
+                                  onChange={(e) => setEditText(e.target.value)}
+                                  autoFocus
+                                />
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <input
+                                    type="date"
+                                    className="input"
+                                    value={editDueDate}
+                                    onChange={(e) => setEditDueDate(e.target.value)}
+                                  />
+                                  
+                                  <select
+                                    className="input"
+                                    value={editPriority}
+                                    onChange={(e) => setEditPriority(e.target.value)}
+                                  >
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                  </select>
+                                </div>
+                                
+                                <div className="flex gap-2 mt-3">
+                                  <button
+                                    onClick={handleSaveEdit}
+                                    className="btn btn-primary flex items-center gap-1 text-sm"
+                                  >
+                                    <Save className="w-4 h-4" />
+                                    Save
+                                  </button>
+                                  
+                                  <button
+                                    onClick={handleCancelEdit}
+                                    className="btn btn-outline flex items-center gap-1 text-sm"
+                                  >
+                                    <X className="w-4 h-4" />
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-start gap-3">
+                                  <div 
+                                    className="flex-shrink-0 mr-1 cursor-grab text-surface-400 hover:text-surface-600 dark:hover:text-surface-300" 
+                                    {...provided.dragHandleProps}
+                                  >
+                                    <GripVertical className="w-5 h-5" />
+                                  </div>
+                                
+                                  <button
+                                    onClick={() => handleToggleComplete(task.id)}
+                                    className={`flex-shrink-0 mt-0.5 ${
+                                      task.completed ? "text-secondary" : "text-surface-400"
+                                    }`}
+                                  >
+                                    {task.completed ? (
+                                      <CheckSquare className="w-5 h-5" />
+                                    ) : (
+                                      <Square className="w-5 h-5" />
+                                    )}
+                                  </button>
+                                  
+                                  <div className="flex-grow min-w-0">
+                                    <p className={`${
+                                      task.completed
+                                        ? "line-through text-surface-400 dark:text-surface-500"
+                                        : "text-surface-800 dark:text-surface-100"
+                                    }`}>
+                                      {task.text}
+                                    </p>
+                                    
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                      {task.dueDate && (
+                                        <span className="inline-flex items-center text-xs px-2 py-1 rounded-md bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
+                                          <Clock className="w-3 h-3 mr-1" />
+                                          {format(new Date(task.dueDate), 'MMM d, yyyy')}
+                                        </span>
+                                      )}
+                                      
+                                      {task.priority && (
+                                        <span className={`inline-flex items-center text-xs px-2 py-1 rounded-md ${
+                                          getPriorityBadge(task.priority).bg
+                                        } ${getPriorityBadge(task.priority).text}`}>
+                                          {getPriorityBadge(task.priority).icon}
+                                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex flex-shrink-0 gap-1">
+                                    <button
+                                      onClick={() => handleStartEdit(task)}
+                                      className="p-1.5 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200 transition-colors"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    
+                                    <button
+                                      onClick={() => handleDeleteTask(task.id)}
+                                      className="p-1.5 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-500 hover:text-red-600 dark:text-surface-400 dark:hover:text-red-400 transition-colors"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </motion.div>
+                        )}
+                      </Draggable>
+                    ))}
+                  </AnimatePresence>
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
         )}
         
         {tasks.length > 0 && (
