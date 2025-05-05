@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import getIcon from '../utils/iconUtils';
@@ -31,7 +30,12 @@ export default function MainFeature({ onTaskChange }) {
   const [editText, setEditText] = useState("");
   const [editDueDate, setEditDueDate] = useState("");
   const [editPriority, setEditPriority] = useState("");
+  const [draggedItem, setDraggedItem] = useState(null);
   
+  // Refs
+  const dragItemRef = useRef(null);
+  const dragOverItemRef = useRef(null);
+
   // Load tasks from localStorage
   useEffect(() => {
     const savedTasks = JSON.parse(localStorage.getItem('tasks')) || [];
@@ -116,32 +120,80 @@ export default function MainFeature({ onTaskChange }) {
     setEditingTask(null);
   };
   
-  // Handle drag end event
-  const handleDragEnd = (result) => {
-    if (!result.destination) return;
+  // Drag functions for HTML5 drag and drop
+  const handleDragStart = (e, index) => {
+    dragItemRef.current = index;
+    e.target.classList.add('opacity-50');
+    setDraggedItem(index);
     
-    const sourceIndex = result.source.index;
-    const destinationIndex = result.destination.index;
+    // This is required for Firefox
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.target.outerHTML);
     
-    if (sourceIndex === destinationIndex) return;
+    // Create a drag image with the same style
+    try {
+      const crt = e.target.cloneNode(true);
+      crt.style.position = "absolute";
+      crt.style.top = "-1000px";
+      document.body.appendChild(crt);
+      e.dataTransfer.setDragImage(crt, 20, 20);
+      setTimeout(() => {
+        document.body.removeChild(crt);
+      }, 0);
+    } catch (err) {
+      console.log('Drag image error:', err);
+    }
+  };
+  
+  const handleDragEnd = (e) => {
+    e.target.classList.remove('opacity-50');
+    setDraggedItem(null);
     
-    const filteredTasksCopy = [...filteredTasks];
-    const [removed] = filteredTasksCopy.splice(sourceIndex, 1);
-    filteredTasksCopy.splice(destinationIndex, 0, removed);
+    // Only reorder if both refs are set
+    if (dragItemRef.current !== null && dragOverItemRef.current !== null) {
+      const filteredTasksCopy = [...filteredTasks];
+      
+      // Get the dragged content
+      const draggedItemContent = filteredTasksCopy[dragItemRef.current];
+      
+      // Remove the item from the array
+      filteredTasksCopy.splice(dragItemRef.current, 1);
+      
+      // Add the item to the new position
+      filteredTasksCopy.splice(dragOverItemRef.current, 0, draggedItemContent);
+      
+      // Create a new array with all tasks, maintaining the order of non-filtered tasks
+      const newTasksOrder = [...tasks];
+      
+      // Map the filtered tasks back to their original indices in the complete tasks array
+      filteredTasks.forEach((task, index) => {
+        const originalIndex = newTasksOrder.findIndex(t => t.id === task.id);
+        if (originalIndex !== -1) {
+          newTasksOrder[originalIndex] = filteredTasksCopy[index];
+        }
+      });
+      
+      // Update state with new order
+      setTasks(newTasksOrder);
+      toast.success("Task order updated");
+      
+      // Reset refs
+      dragItemRef.current = null;
+      dragOverItemRef.current = null;
+    }
+  };
+  
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    dragOverItemRef.current = index;
     
-    // Create a new array with all tasks, maintaining the order of non-filtered tasks
-    const newTasksOrder = [...tasks];
-    
-    // Map the filtered tasks back to their original indices in the complete tasks array
-    filteredTasks.forEach((task, index) => {
-      const originalIndex = newTasksOrder.findIndex(t => t.id === task.id);
-      if (originalIndex !== -1) {
-        newTasksOrder[originalIndex] = filteredTasksCopy[index];
-      }
-    });
-    
-    setTasks(newTasksOrder);
-    toast.success("Task order updated");
+    // Return if drag item is the same as drag over item
+    if (dragItemRef.current === dragOverItemRef.current) return;
+  };
+  
+  const handleDragEnter = (e, index) => {
+    e.preventDefault();
+    dragOverItemRef.current = index;
   };
   
   // Filter tasks based on filter state
@@ -294,164 +346,147 @@ export default function MainFeature({ onTaskChange }) {
             </p>
           </div>
         ) : (
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="tasks">
-              {(provided) => (
-                <div 
-                  className="space-y-3"
-                  {...provided.droppableProps}
-                  ref={provided.innerRef}
+          <div className="space-y-3">
+            <AnimatePresence initial={false}>
+              {filteredTasks.map((task, index) => (
+                <motion.div
+                  key={task.id}
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className={`relative p-4 border dark:border-surface-700 rounded-xl ${
+                    draggedItem === index
+                      ? "opacity-50 shadow-lg bg-surface-50/80 dark:bg-surface-700/80 border-primary/20 dark:border-primary/20"
+                      : task.completed
+                        ? "bg-surface-100/50 dark:bg-surface-800/50"
+                        : "bg-white dark:bg-surface-800"
+                  }`}
+                  draggable={editingTask !== task.id}
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragEnter={(e) => handleDragEnter(e, index)}
                 >
-                  <AnimatePresence initial={false}>
-                    {filteredTasks.map((task, index) => (
-                      <Draggable 
-                        key={task.id} 
-                        draggableId={task.id.toString()} 
-                        index={index}
-                        isDragDisabled={editingTask === task.id}
-                      >
-                        {(provided, snapshot) => (
-                          <motion.div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className={`relative p-4 border dark:border-surface-700 rounded-xl ${
-                              snapshot.isDragging
-                                ? "shadow-lg bg-surface-50/80 dark:bg-surface-700/80 border-primary/20 dark:border-primary/20"
-                                : task.completed
-                                  ? "bg-surface-100/50 dark:bg-surface-800/50"
-                                  : "bg-white dark:bg-surface-800"
-                            }`}
-                          >
-                            {editingTask === task.id ? (
-                              <div className="space-y-3">
-                                <input
-                                  type="text"
-                                  className="input"
-                                  value={editText}
-                                  onChange={(e) => setEditText(e.target.value)}
-                                  autoFocus
-                                />
-                                
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                  <input
-                                    type="date"
-                                    className="input"
-                                    value={editDueDate}
-                                    onChange={(e) => setEditDueDate(e.target.value)}
-                                  />
-                                  
-                                  <select
-                                    className="input"
-                                    value={editPriority}
-                                    onChange={(e) => setEditPriority(e.target.value)}
-                                  >
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                  </select>
-                                </div>
-                                
-                                <div className="flex gap-2 mt-3">
-                                  <button
-                                    onClick={handleSaveEdit}
-                                    className="btn btn-primary flex items-center gap-1 text-sm"
-                                  >
-                                    <Save className="w-4 h-4" />
-                                    Save
-                                  </button>
-                                  
-                                  <button
-                                    onClick={handleCancelEdit}
-                                    className="btn btn-outline flex items-center gap-1 text-sm"
-                                  >
-                                    <X className="w-4 h-4" />
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="flex items-start gap-3">
-                                  <div 
-                                    className="flex-shrink-0 mr-1 cursor-grab text-surface-400 hover:text-surface-600 dark:hover:text-surface-300" 
-                                    {...provided.dragHandleProps}
-                                  >
-                                    <GripVertical className="w-5 h-5" />
-                                  </div>
-                                
-                                  <button
-                                    onClick={() => handleToggleComplete(task.id)}
-                                    className={`flex-shrink-0 mt-0.5 ${
-                                      task.completed ? "text-secondary" : "text-surface-400"
-                                    }`}
-                                  >
-                                    {task.completed ? (
-                                      <CheckSquare className="w-5 h-5" />
-                                    ) : (
-                                      <Square className="w-5 h-5" />
-                                    )}
-                                  </button>
-                                  
-                                  <div className="flex-grow min-w-0">
-                                    <p className={`${
-                                      task.completed
-                                        ? "line-through text-surface-400 dark:text-surface-500"
-                                        : "text-surface-800 dark:text-surface-100"
-                                    }`}>
-                                      {task.text}
-                                    </p>
-                                    
-                                    <div className="flex flex-wrap gap-2 mt-2">
-                                      {task.dueDate && (
-                                        <span className="inline-flex items-center text-xs px-2 py-1 rounded-md bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
-                                          <Clock className="w-3 h-3 mr-1" />
-                                          {format(new Date(task.dueDate), 'MMM d, yyyy')}
-                                        </span>
-                                      )}
-                                      
-                                      {task.priority && (
-                                        <span className={`inline-flex items-center text-xs px-2 py-1 rounded-md ${
-                                          getPriorityBadge(task.priority).bg
-                                        } ${getPriorityBadge(task.priority).text}`}>
-                                          {getPriorityBadge(task.priority).icon}
-                                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="flex flex-shrink-0 gap-1">
-                                    <button
-                                      onClick={() => handleStartEdit(task)}
-                                      className="p-1.5 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200 transition-colors"
-                                    >
-                                      <Edit className="w-4 h-4" />
-                                    </button>
-                                    
-                                    <button
-                                      onClick={() => handleDeleteTask(task.id)}
-                                      className="p-1.5 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-500 hover:text-red-600 dark:text-surface-400 dark:hover:text-red-400 transition-colors"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </>
+                  {editingTask === task.id ? (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        className="input"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        autoFocus
+                      />
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input
+                          type="date"
+                          className="input"
+                          value={editDueDate}
+                          onChange={(e) => setEditDueDate(e.target.value)}
+                        />
+                        
+                        <select
+                          className="input"
+                          value={editPriority}
+                          onChange={(e) => setEditPriority(e.target.value)}
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                      </div>
+                      
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={handleSaveEdit}
+                          className="btn btn-primary flex items-center gap-1 text-sm"
+                        >
+                          <Save className="w-4 h-4" />
+                          Save
+                        </button>
+                        
+                        <button
+                          onClick={handleCancelEdit}
+                          className="btn btn-outline flex items-center gap-1 text-sm"
+                        >
+                          <X className="w-4 h-4" />
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-start gap-3">
+                        <div 
+                          className="flex-shrink-0 mr-1 cursor-grab text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
+                        >
+                          <GripVertical className="w-5 h-5" />
+                        </div>
+                      
+                        <button
+                          onClick={() => handleToggleComplete(task.id)}
+                          className={`flex-shrink-0 mt-0.5 ${
+                            task.completed ? "text-secondary" : "text-surface-400"
+                          }`}
+                        >
+                          {task.completed ? (
+                            <CheckSquare className="w-5 h-5" />
+                          ) : (
+                            <Square className="w-5 h-5" />
+                          )}
+                        </button>
+                        
+                        <div className="flex-grow min-w-0">
+                          <p className={`${
+                            task.completed
+                              ? "line-through text-surface-400 dark:text-surface-500"
+                              : "text-surface-800 dark:text-surface-100"
+                          }`}>
+                            {task.text}
+                          </p>
+                          
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {task.dueDate && (
+                              <span className="inline-flex items-center text-xs px-2 py-1 rounded-md bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
+                                <Clock className="w-3 h-3 mr-1" />
+                                {format(new Date(task.dueDate), 'MMM d, yyyy')}
+                              </span>
                             )}
-                          </motion.div>
-                        )}
-                      </Draggable>
-                    ))}
-                  </AnimatePresence>
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          </DragDropContext>
+                            
+                            {task.priority && (
+                              <span className={`inline-flex items-center text-xs px-2 py-1 rounded-md ${
+                                getPriorityBadge(task.priority).bg
+                              } ${getPriorityBadge(task.priority).text}`}>
+                                {getPriorityBadge(task.priority).icon}
+                                {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-shrink-0 gap-1">
+                          <button
+                            onClick={() => handleStartEdit(task)}
+                            className="p-1.5 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200 transition-colors"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          
+                          <button
+                            onClick={() => handleDeleteTask(task.id)}
+                            className="p-1.5 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-500 hover:text-red-600 dark:text-surface-400 dark:hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
         )}
         
         {tasks.length > 0 && (
