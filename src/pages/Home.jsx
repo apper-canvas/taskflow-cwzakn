@@ -44,7 +44,7 @@ export default function Home() {
           transition={{ duration: 0.5 }}
           className="mb-8"
         >
-          <h1 className="mb-2">Welcome to TaskFlow RJ And VG</h1>
+          <h1 className="mb-2">Welcome to TaskFlow Rishabh</h1>
           <p className="text-surface-600 dark:text-surface-400 max-w-2xl">
             Organize your day, boost your productivity, and never forget a task again.
             TaskFlow helps you stay on top of everything you need to do.
