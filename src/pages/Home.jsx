@@ -35,10 +35,6 @@ export default function Home() {
     }
   };
 
-  const testError = () => {
-    console.log('abcd :', abcd);
-  };
-  
   return (
     <div className="space-y-8">
       <section>
@@ -53,7 +49,6 @@ export default function Home() {
             Organize your day, boost your productivity, and never forget a task again.
             TaskFlow helps you stay on top of everything you need to do.
           </p>
-          <button onClick={testError}>Click Me</button>
         </motion.div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
