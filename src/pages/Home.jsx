@@ -34,6 +34,13 @@ export default function Home() {
       toast.success("Task completed! Great job! 🎉");
     }
   };
+
+    const testPromiseError = () => {
+    // This promise rejection is not handled with .catch()
+    new Promise((resolve, reject) => {
+      reject(new Error("This is an unhandled promise rejection"));
+    });
+  };
   
   return (
     <div className="space-y-8">
@@ -49,6 +56,7 @@ export default function Home() {
             Organize your day, boost your productivity, and never forget a task again.
             TaskFlow helps you stay on top of everything you need to do.
           </p>
+          <button onClick={testPromiseError}>Click Me</button>
         </motion.div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
