@@ -35,7 +35,7 @@ export default function App() {
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-primary dark:text-primary-light font-bold text-xl">
-              Tasker
+              Task List
             </span>
           </div>
           
@@ -58,7 +58,7 @@ export default function App() {
       
       <footer className="bg-white dark:bg-surface-800 border-t border-surface-200 dark:border-surface-700 py-4">
         <div className="container mx-auto px-4 text-center text-sm text-surface-500">
-          <p>© {new Date().getFullYear()} Tasker. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Task List. All rights reserved.</p>
         </div>
       </footer>
       
